@@ -1,109 +1,120 @@
-// services/auth.ts - UPDATED TO MATCH BACKEND
+// services/auth.ts
 import api from './api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export const authService = {
-  // Login user
+  // Login method
   async login(email: string, password: string) {
+    console.log(`🔐 Attempting login for: ${email}`);
+    
     try {
-      console.log('Attempting login with:', { email });
-      const response = await api.post('/auth/login', { email, password });
-      const responseData = response.data;
-      
-      // Your backend returns: { success, message, data: { token, user } }
-      if (responseData.success && responseData.data) {
-        const { token, user } = responseData.data;
-        
-        // Store token and user data
-        if (token) {
-          await AsyncStorage.setItem('token', token);
-        }
-        
-        if (user) {
-          await AsyncStorage.setItem('user', JSON.stringify(user));
-        }
-        
-        console.log('Login successful for user:', user?.email || email);
-        return { success: true, user, token };
-      } else {
-        throw new Error(responseData.error || 'Login failed');
-      }
-    } catch (error: any) {
-      console.error('Login error details:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status
+      const response = await api.post('/auth/login', {
+        email,
+        password
       });
       
-      let errorMessage = 'Login failed';
+      console.log('✅ Login response received:', response.data);
       
-      if (error.response?.data) {
-        const data = error.response.data;
-        errorMessage = data.error || data.message || errorMessage;
-      } else if (error.message) {
-        errorMessage = error.message;
-      }
-      
-      throw { message: errorMessage, status: error.response?.status };
-    }
-  },
-
-  // Register user - ALSO FIXED FOR BACKEND RESPONSE
-  async register(userData: { email: string; password: string; name?: string }) {
-    try {
-      const response = await api.post('/auth/register', userData);
-      const responseData = response.data;
-      
-      if (responseData.success) {
-        return { 
-          success: true, 
-          message: responseData.message || 'Registration successful'
+      // FIX: Token is inside response.data.data, not response.data
+      if (response.data.success && response.data.data?.token) {
+        const { token, user } = response.data.data;
+        
+        // Save token and user data
+        await AsyncStorage.setItem('token', token);
+        await AsyncStorage.setItem('user', JSON.stringify(user));
+        
+        console.log('✅ Token saved successfully');
+        
+        return {
+          success: true,
+          user: user,
+          token: token
         };
       } else {
-        throw new Error(responseData.error || 'Registration failed');
+        throw new Error('No token received from server');
       }
     } catch (error: any) {
-      console.error('Register error details:', error.response?.data || error.message);
-      
-      let errorMessage = 'Registration failed';
-      if (error.response?.data) {
-        const data = error.response.data;
-        errorMessage = data.error || data.message || errorMessage;
-      }
-      
-      throw { message: errorMessage };
+      console.error('❌ Login service error:', error);
+      throw error;
     }
   },
 
-  // ... rest of the functions remain the same
+  // Register method
+  async register(name: string, email: string, password: string) {
+    try {
+      const response = await api.post('/auth/register', {
+        name,
+        email,
+        password
+      });
+      
+      console.log('✅ Register response:', response.data);
+      
+      // FIX: Same issue - token is inside data.data
+      if (response.data.success && response.data.data?.token) {
+        const { token, user } = response.data.data;
+        
+        await AsyncStorage.setItem('token', token);
+        await AsyncStorage.setItem('user', JSON.stringify(user));
+        
+        return {
+          success: true,
+          user: user,
+          token: token
+        };
+      }
+      
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ Registration error:', error);
+      throw error;
+    }
+  },
+
+  // Logout method
   async logout() {
     try {
       await AsyncStorage.removeItem('token');
       await AsyncStorage.removeItem('user');
-      return { success: true, message: 'Logged out successfully' };
+      return true;
     } catch (error) {
       console.error('Logout error:', error);
       throw error;
     }
   },
 
+  // Check if user is logged in
   async isLoggedIn() {
     try {
       const token = await AsyncStorage.getItem('token');
-      return !!token;
+      const user = await AsyncStorage.getItem('user');
+      return !!token && !!user;
     } catch (error) {
-      console.error('Check login error:', error);
+      console.error('Auth check error:', error);
       return false;
     }
   },
 
+  // Get current user
   async getCurrentUser() {
     try {
-      const user = await AsyncStorage.getItem('user');
-      return user ? JSON.parse(user) : null;
+      const userStr = await AsyncStorage.getItem('user');
+      return userStr ? JSON.parse(userStr) : null;
     } catch (error) {
       console.error('Get user error:', error);
       return null;
     }
+  },
+
+  // Get token
+  async getToken() {
+    try {
+      return await AsyncStorage.getItem('token');
+    } catch (error) {
+      console.error('Get token error:', error);
+      return null;
+    }
   }
 };
+
+export default authService;

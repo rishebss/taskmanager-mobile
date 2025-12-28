@@ -1,60 +1,48 @@
 // services/api.ts
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import Constants from 'expo-constants';
+import { Platform } from 'react-native';
 
-// API URLs for different environments
-const API_URLS = {
-  development: 'http://10.0.2.2:3000/api', // Android emulator
-  staging: 'https://your-staging-backend.vercel.app/api',
-  production: 'https://your-production-backend.vercel.app/api',
+// Use localhost for testing
+const getApiUrl = () => {
+  // Always use localhost for now
+  return 'http://localhost:3000/api';
+  
+  // If testing on physical device, you'll need your computer's IP:
+  // return 'http://192.168.1.5:3000/api'; // Replace with your computer's IP
 };
 
-// Determine environment
-const getEnvironment = () => {
-  if (__DEV__) return 'development';
-  // You can also check release channel or build type
-  return 'production';
-};
-
-const ENV = getEnvironment();
-const API_URL = API_URLS[ENV] || API_URLS.production;
-
-console.log(`API Environment: ${ENV}, URL: ${API_URL}`);
+const API_URL = getApiUrl();
+console.log(`📡 Using API URL: ${API_URL}`);
 
 const api = axios.create({
   baseURL: API_URL,
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 15000,
+  timeout: 30000, // Increased timeout
 });
 
 // Request interceptor
 api.interceptors.request.use(
   async (config) => {
+    console.log(`🌐 API Request: ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
+    
+    // Add token if exists
     try {
       const token = await AsyncStorage.getItem('token');
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
+        console.log('✓ Token attached to request');
       }
     } catch (error) {
       console.error('Error getting token:', error);
     }
     
-    // Log only in development
-    if (__DEV__) {
-      console.log('API Request:', {
-        url: config.url,
-        method: config.method,
-        data: config.data
-      });
-    }
-    
     return config;
   },
   (error) => {
-    console.error('Request error:', error);
+    console.error('❌ Request setup error:', error);
     return Promise.reject(error);
   }
 );
@@ -62,27 +50,31 @@ api.interceptors.request.use(
 // Response interceptor
 api.interceptors.response.use(
   (response) => {
-    if (__DEV__) {
-      console.log('API Response:', {
-        url: response.config.url,
-        status: response.status,
-      });
-    }
+    console.log(`✅ API Success: ${response.status} ${response.config.url}`);
     return response;
   },
   async (error) => {
-    console.error('API Error:', {
+    console.error('❌ API Error:', {
       url: error.config?.url,
       status: error.response?.status,
       message: error.message,
+      code: error.code,
     });
 
-    if (error.response?.status === 401) {
-      await AsyncStorage.removeItem('token');
-      await AsyncStorage.removeItem('user');
+    // Better error messages
+    let errorMessage = 'Network error';
+    
+    if (error.code === 'ECONNABORTED') {
+      errorMessage = 'Request timeout. Is your backend running?';
+    } else if (!error.response) {
+      errorMessage = `Cannot connect to server at ${API_URL}. Make sure:\n\n1. Backend is running (npm start)\n2. Correct port (3000)\n3. No firewall blocking`;
     }
     
-    return Promise.reject(error);
+    return Promise.reject({
+      message: errorMessage,
+      status: error.response?.status,
+      originalError: error
+    });
   }
 );
 

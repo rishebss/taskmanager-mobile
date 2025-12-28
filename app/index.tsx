@@ -1,17 +1,17 @@
+import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-  View,
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
-  Alert,
-  ScrollView,
-  ActivityIndicator,
+  View,
 } from 'react-native';
-import { router } from 'expo-router';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { authService } from '../services/auth'; // Import auth service
 
@@ -52,46 +52,67 @@ export default function LoginScreen() {
   }
 
 
- const handleLogin = async () => {
-  // Basic validation
-  if (!email.trim()) {
-    Alert.alert('Error', 'Please enter your email');
-    return;
-  }
-  if (!password.trim()) {
-    Alert.alert('Error', 'Please enter your password');
-    return;
-  }
-  if (!/\S+@\S+\.\S+/.test(email)) {
-    Alert.alert('Error', 'Please enter a valid email address');
-    return;
-  }
+  const handleLogin = async () => {
+    // Basic validation
+    if (!email.trim()) {
+      Alert.alert('Error', 'Please enter your email');
+      return;
+    }
+    if (!password.trim()) {
+      Alert.alert('Error', 'Please enter your password');
+      return;
+    }
+    if (!/\S+@\S+\.\S+/.test(email)) {
+      Alert.alert('Error', 'Please enter a valid email address');
+      return;
+    }
+    
+    setLoading(true);
+    try {
+      console.log('🔄 Starting login process...');
+      
+      // Check if authService exists
+      if (!authService || typeof authService.login !== 'function') {
+        throw new Error('Auth service not properly initialized');
+      }
+      
+      // Call real auth service
+      const result = await authService.login(email, password);
+      
+      console.log('✅ Login successful, navigating...');
+      
+      // Navigate IMMEDIATELY - don't wait for alert
+      setTimeout(() => {
+        router.replace('/tasks');
+      }, 100);
+      
+    } catch (error: any) {
+      console.error('❌ Login failed with details:', {
+        message: error.message,
+        stack: error.stack,
+        originalError: error.originalError
+      });
+      
+      // Show user-friendly error message
+      let errorMessage = error.message || 'Login failed';
+      
+      // Check for common errors
+      if (error.message.includes('Network Error') || error.message.includes('ECONNREFUSED')) {
+        errorMessage = 'Cannot connect to server. Please check:\n\n1. Your internet connection\n2. The server might be down\n\nTry again later.';
+      } else if (error.status === 401) {
+        errorMessage = 'Invalid email or password';
+      } else if (error.status === 404) {
+        errorMessage = 'Server endpoint not found. Please contact support.';
+      } else if (error.status === 500) {
+        errorMessage = 'Server error. Please try again later.';
+      }
+      
+      Alert.alert('Login Failed', errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
   
-  setLoading(true);
-  try {
-    // Call real auth service
-    const result = await authService.login(email, password);
-    
-    console.log('✅ Login successful, navigating...');
-    
-    // Navigate IMMEDIATELY - don't wait for alert
-    setTimeout(() => {
-      router.replace('/tasks');
-    }, 100);
-    
-    // Optional: Show quick success message
-    // Alert.alert('Success', 'Login successful!');
-    
-  } catch (error: any) {
-    console.error('❌ Login failed:', error);
-    Alert.alert(
-      'Login Failed',
-      error.message || 'Invalid email or password. Please try again.'
-    );
-  } finally {
-    setLoading(false);
-  }
-};
   const handleSignUp = () => {
     router.push('/signup');
   };
