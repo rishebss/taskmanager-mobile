@@ -1,0 +1,9 @@
+{
+  "expo": {
+    "scheme": "taskmanager",
+    "plugins": ["expo-router"],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
