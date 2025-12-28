@@ -6,7 +6,7 @@ import { Platform } from 'react-native';
 // Use localhost for testing
 const getApiUrl = () => {
   // Always use localhost for now
-  return 'http://localhost:3000/api';
+  return 'https://taskmanager-backend-tau.vercel.app/api';
   
   // If testing on physical device, you'll need your computer's IP:
   // return 'http://192.168.1.5:3000/api'; // Replace with your computer's IP
